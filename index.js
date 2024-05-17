@@ -1,18 +1,16 @@
 const express = require("express");
 const passport = require("passport");
 const session = require('express-session');
-const { urlencoded } = require("body-parser");
 const bodyParser = require("body-parser");
 const port = 3000;
+
 const app = express();
 
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({extended:true}));
+// Middleware setup
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-/***********************************************************Google Login**********************************************/ 
-// Initialize passport
-require('./auth');
-
+// Session configuration
 app.use(session({
     secret: 'mysecret',
     resave: false,
@@ -20,14 +18,17 @@ app.use(session({
     cookie: { secure: false }
 }));
 
-// Passport middleware should be initialized after express-session middleware
+// Initialize Passport and session
+require('./auth');  // Assuming 'auth' contains Passport configuration
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Custom middleware
+// Custom middleware to check if user is logged in
 function isLoggedIn(req, res, next) {
     req.user ? next() : res.sendStatus(401);
 }
+
+// Google OAuth routes
 app.get('/auth/google',
     passport.authenticate('google', { scope: ['email', 'profile'] })
 );
@@ -40,55 +41,55 @@ app.get('/auth/google/callback',
 );
 
 app.get('/auth/protected', isLoggedIn, (req, res) => {
-    let name = req.user.displayName;
-    let email=req.user.email;
-    // store this data in database (name and email)
-    res.send(`Hello ${name} with email ${email}`);
+    const { displayName, email } = req.user;
+    // Store user data in the database
+    res.send(`Hello ${displayName} with email ${email}`);
 });
 
 app.get('/auth/google/failure', (req, res) => {
-    res.send("failed");
+    res.send("Google authentication failed");
 });
 
-app.use('/auth/logout',(req,res)=>{
-    req.session.destroy();
-    res.redirect('/');
-})
+app.use('/auth/logout', (req, res) => {
+    req.logout(() => {
+        req.session.destroy();
+        res.redirect('/');
+    });
+});
 
-/***********************************************************Google Login**********************************************/ 
-
+// Route to render user details form
 app.get("/", (req, res) => {
     res.render('userDetailsForm.ejs');
 });
 
-// user details route
-app.post('/userDetails',(req,res)=>{
-    const userDetails=req.body;
+// Route to handle user details submission
+app.post('/userDetails', (req, res) => {
+    const userDetails = req.body;
     console.log(userDetails);
+    // Store user details in the database
     res.sendStatus(200);
-    // store this data in database and redirect to any route
-})
+});
 
-// Team creation route with team name as input from form and team invitation code as output
-app.post('/createTeam',(req,res)=>{
-    const invitationCode=Math.floor(Math.random(10000)*99999);// Five digit numberic code
-    const teamName=req.body.teamName;
-    res.send(`Your team ${teamName} is created, Your team invitation code is: ${invitationCode}`);
-    // Save this team in database
-})
+// Route to create a team
+app.post('/createTeam', (req, res) => {
+    const invitationCode = Math.floor(Math.random() * 89999 + 10000); // Five-digit numeric code
+    const teamName = req.body.teamName;
+    // Save team in the database
+    res.send(`Your team ${teamName} is created. Your team invitation code is: ${invitationCode}`);
+});
 
-// Team joining with invitation code route
-app.post('/joinTeam',(req,res)=>{
-    const invitationCode=req.body.invitationCode;
-    if(invitationCode.length==5){
-        // check for this invitation code in database and add the current member in the team in database
-        res.send(`Congratulations, You have joined the team!`);
+// Route to join a team using an invitation code
+app.post('/joinTeam', (req, res) => {
+    const invitationCode = req.body.invitationCode;
+    if (invitationCode.length === 5) {
+        // Check invitation code in the database and add member to the team
+        res.send(`Congratulations, you have joined the team!`);
+    } else {
+        res.send("Incorrect invitation code!");
     }
-    else{
-        res.send("Incorrect Invitation Code!");
-    }
-})
-// Start server
+});
+
+// Start the server
 app.listen(port, () => {
     console.log(`Server listening at port ${port}`);
 });
